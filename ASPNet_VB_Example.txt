@@ -1,0 +1,70 @@
+Imports System.Data
+Imports System.Data.SqlClient
+
+Partial Class Geo
+    Inherits System.Web.UI.Page
+
+    Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
+        If Not Page.IsPostBack Then
+            GetLocation()
+        End If
+    End Sub
+
+    Private Sub GetLocation()
+        Dim dt As New DataTable
+        dt = ReturnDT("Lookup_geoip", "@IP", GetIPAddress)
+
+        Dim str As String = "<strong>You are visiting from:</strong> " & dt.Rows(0).Item("city") & ", " & dt.Rows(0).Item("region") & ", " & dt.Rows(0).Item("country") & "<br/> <strong>Coordinates:</strong> " & dt.Rows(0).Item("latitude") & "," & dt.Rows(0).Item("longitude")
+
+        dt.Clear()
+        dt.Dispose()
+
+        'Output string...
+        Response.Write(str)
+    End Sub
+
+    'Attempt to grab User's IP - this can be tricked by VPN's, Proxy servers, etc.
+    Private Function GetIPAddress() As String
+        Dim context As System.Web.HttpContext = System.Web.HttpContext.Current
+        Dim sIPAddress As String = context.Request.ServerVariables("HTTP_X_FORWARDED_FOR")
+        If String.IsNullOrEmpty(sIPAddress) Then
+            Return context.Request.ServerVariables("REMOTE_ADDR")
+        Else
+            Dim ipArray As String() = sIPAddress.Split(New [Char]() {","c})
+            Return ipArray(0)
+        End If
+    End Function
+
+    'Reusable Datatable 
+    Private Function ReturnDT(ByVal sp As String, Optional ByVal param1 As String = "", Optional ByVal paramvalue1 As String = "", Optional ByVal param2 As String = "", Optional ByVal paramvalue2 As String = "", Optional ByVal param3 As String = "", Optional ByVal paramvalue3 As String = "") As DataTable
+        Dim oConn As SqlConnection = New SqlConnection(System.Web.Configuration.WebConfigurationManager.ConnectionStrings("ConnectionString").ConnectionString)
+        Dim oCom As New SqlCommand()
+        Dim da As New SqlDataAdapter()
+
+        With oCom
+            .Connection = oConn
+            .CommandType = CommandType.StoredProcedure
+            .CommandText = sp
+            If Not param1 = "" Then
+                .Parameters.AddWithValue(param1, paramvalue1)
+                If Not param2 = "" Then
+                    .Parameters.AddWithValue(param2, paramvalue2)
+                    If Not param3 = "" Then
+                        .Parameters.AddWithValue(param3, paramvalue3)
+                    End If
+                End If
+            End If
+        End With
+
+        Dim dt As DataTable = New DataTable
+        da.SelectCommand = oCom
+        da.Fill(dt)
+
+        da.Dispose()
+        da = Nothing
+        oConn.Dispose()
+        oConn = Nothing
+
+        Return dt
+    End Function
+End Class

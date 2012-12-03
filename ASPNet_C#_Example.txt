@@ -1,0 +1,75 @@
+using System.Data;
+using System.Data.SqlClient;
+
+partial class Geo : System.Web.UI.Page
+{
+
+	protected void  Page_Load(object sender, System.EventArgs e)
+	{
+		if (!Page.IsPostBack) {
+			GetLocation();
+		}
+	}
+
+	private void GetLocation()
+	{
+		DataTable dt = new DataTable();
+		dt = ReturnDT("Lookup_geoip", "@IP", GetIPAddress);
+
+		string str = "<strong>You are visiting from:</strong> " + dt.Rows(0).Item("city") + ", " + dt.Rows(0).Item("region") + ", " + dt.Rows(0).Item("country") + "<br/> <strong>Coordinates:</strong> " + dt.Rows(0).Item("latitude") + "," + dt.Rows(0).Item("longitude");
+
+		dt.Clear();
+		dt.Dispose();
+
+		//Output string...
+		Response.Write(str);
+	}
+
+	//Attempt to grab User's IP - this can be tricked by VPN's, Proxy servers, etc.
+	private string GetIPAddress()
+	{
+		System.Web.HttpContext context = System.Web.HttpContext.Current;
+		string sIPAddress = context.Request.ServerVariables("HTTP_X_FORWARDED_FOR");
+		if (string.IsNullOrEmpty(sIPAddress)) {
+			return context.Request.ServerVariables("REMOTE_ADDR");
+		} else {
+			string[] ipArray = sIPAddress.Split(new Char[] { ',' });
+			return ipArray(0);
+		}
+	}
+
+	//Reusable Datatable 
+	private DataTable ReturnDT(string sp, string param1 = "", string paramvalue1 = "", string param2 = "", string paramvalue2 = "", string param3 = "", string paramvalue3 = "")
+	{
+		SqlConnection oConn = new SqlConnection(System.Web.Configuration.WebConfigurationManager.ConnectionStrings("ConnectionString").ConnectionString);
+		SqlCommand oCom = new SqlCommand();
+		SqlDataAdapter da = new SqlDataAdapter();
+
+		{
+			oCom.Connection = oConn;
+			oCom.CommandType = CommandType.StoredProcedure;
+			oCom.CommandText = sp;
+			if (!string.IsNullOrEmpty(param1)) {
+				oCom.Parameters.AddWithValue(param1, paramvalue1);
+				if (!string.IsNullOrEmpty(param2)) {
+					oCom.Parameters.AddWithValue(param2, paramvalue2);
+					if (!string.IsNullOrEmpty(param3)) {
+						oCom.Parameters.AddWithValue(param3, paramvalue3);
+					}
+				}
+			}
+		}
+
+		DataTable dt = new DataTable();
+		da.SelectCommand = oCom;
+		da.Fill(dt);
+
+		da.Dispose();
+		da = null;
+		oConn.Dispose();
+		oConn = null;
+
+		return dt;
+	}
+}
+
